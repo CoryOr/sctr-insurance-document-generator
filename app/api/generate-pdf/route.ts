@@ -1,4 +1,5 @@
 // app/api/generate-pdf/route.ts
+import { deliverToInsurer } from "@/lib/delivery/deliverToInsurer";
 import { chromium } from "playwright";
 import { renderTemplate } from "@/lib/pdf/templates";
 import fs from "fs/promises";
@@ -156,6 +157,20 @@ export async function POST(req: Request) {
         printBackground: true,
         preferCSSPageSize: true,
       });
+
+      if (!preview) {
+        const jobId = sessionId ?? crypto.randomUUID();
+
+        try {
+          await deliverToInsurer({
+            insurer,
+            rows,
+            jobId,
+          });
+        } catch (deliveryError) {
+          console.error("Insurer email delivery failed:", deliveryError);
+        }
+      }
 
       return new Response(new Uint8Array(pdfBuffer), {
         headers: {
