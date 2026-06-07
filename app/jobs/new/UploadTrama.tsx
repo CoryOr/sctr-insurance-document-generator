@@ -164,6 +164,11 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
       return;
     }
 
+    if (!file) {
+      setError("Missing original Excel file.");
+      return;
+    }
+
     const payload = {
       insurer,
       preview: Boolean(opts?.preview),
@@ -173,10 +178,13 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
       rows: result.rows,
     };
 
+    const fd = new FormData();
+    fd.append("payload", JSON.stringify(payload));
+    fd.append("originalExcel", file, file.name);
+
     const res = await fetch("/api/generate-pdf", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: fd,
     });
 
     if (!res.ok) {

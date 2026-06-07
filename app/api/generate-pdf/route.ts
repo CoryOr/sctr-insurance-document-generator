@@ -43,7 +43,36 @@ async function getPaidSession(sessionId: string) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    let body: any;
+    let originalExcelBuffer: Buffer | null = null;
+    let originalExcelFilename: string | null = null;
+
+    const contentType = req.headers.get("content-type") ?? "";
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+
+      const payloadRaw = formData.get("payload");
+      if (typeof payloadRaw !== "string") {
+        return Response.json({ error: "Missing payload" }, { status: 400 });
+      }
+
+      body = JSON.parse(payloadRaw);
+
+      const originalExcel = formData.get("originalExcel");
+
+      if (
+        originalExcel &&
+        typeof originalExcel === "object" &&
+        "arrayBuffer" in originalExcel
+      ) {
+        const excelFile = originalExcel as File;
+        originalExcelFilename = excelFile.name;
+        originalExcelBuffer = Buffer.from(await excelFile.arrayBuffer());
+      }
+    } else {
+      body = await req.json();
+    }
 
     const insurer = String(body.insurer ?? "").toLowerCase();
     const preview = Boolean(body.preview);
@@ -162,10 +191,15 @@ export async function POST(req: Request) {
         const jobId = sessionId ?? crypto.randomUUID();
 
         try {
+          if (!originalExcelBuffer || !originalExcelFilename) {
+            throw new Error("Original Excel file missing for insurer delivery");
+          }
+
           await deliverToInsurer({
             insurer,
-            rows,
             jobId,
+            originalExcelBuffer,
+            originalExcelFilename,
           });
         } catch (deliveryError) {
           console.error("Insurer email delivery failed:", deliveryError);
