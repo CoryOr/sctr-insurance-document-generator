@@ -258,188 +258,282 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
   }
 
   return (
-    <div className="mt-6 max-w-6xl rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
-      <p className="text-xl font-semibold text-zinc-100">
-        Upload worker Excel
-      </p>
+    <div className="mt-8 w-full max-w-5xl rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-2xl backdrop-blur-2xl">
+      <div className="rounded-[1.5rem] border border-white/10 bg-zinc-950/80 p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-teal-200">
+              Step 1
+            </div>
 
-      <input
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        className="mt-4 block w-full cursor-pointer rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 file:mr-4 file:rounded-md file:border-0 file:bg-zinc-200 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-zinc-900 hover:border-zinc-700"
-        onChange={(e) => {
-          const f = e.target.files?.[0] ?? null;
-          setFile(f);
-          setResult(null);
-          setError(null);
-        }}
-      />
+            <h2 className="text-2xl font-black tracking-tight text-zinc-50">
+              Upload File
+            </h2>
 
-      <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-        <h3 className="text-base font-semibold text-zinc-100">
-          Vigencia del PDF
-        </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+              Choose the worker file for {insurerLabel(insurer)} and confirm the
+              PDF validity range before parsing.
+            </p>
+          </div>
 
-        <p className="mt-1 text-sm text-zinc-400">
-          Selecciona el rango de vigencia que aparecerá en la constancia.
-        </p>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-zinc-300">
-              Vigencia inicio
-            </span>
-            <input
-              type="date"
-              value={vigencia.inicio}
-              onChange={(e) =>
-                setVigencia((prev) => ({
-                  ...prev,
-                  inicio: e.target.value,
-                }))
-              }
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-zinc-300">
-              Vigencia fin
-            </span>
-            <input
-              type="date"
-              value={vigencia.fin}
-              onChange={(e) =>
-                setVigencia((prev) => ({
-                  ...prev,
-                  fin: e.target.value,
-                }))
-              }
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-            />
-          </label>
+          <div className="rounded-full border border-teal-300/20 bg-teal-300/10 px-3 py-1 text-sm font-bold text-teal-200">
+            {insurerLabel(insurer)}
+          </div>
         </div>
 
-        {!datesValid && (
-          <p className="mt-3 text-sm text-red-400">
-            La fecha de inicio no puede ser posterior a la fecha de fin.
-          </p>
-        )}
-      </div>
+        <div className="mt-6 grid gap-5">
+          <label className="group flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-700 bg-zinc-950/70 px-6 py-8 text-center transition hover:border-teal-300/50 hover:bg-zinc-950">
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setFile(f);
+                setResult(null);
+                setError(null);
+              }}
+            />
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          onClick={parseNow}
-          disabled={!file || loading || !datesValid}
-          className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {loading ? "Parsing…" : "Parse file"}
-        </button>
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-2xl font-black text-zinc-950 transition group-hover:bg-white">
+              ↑
+            </div>
 
-        {result?.rows?.length > 0 && (
-          <>
-            {allowPreview && canGeneratePdf && (
-              <button
-                onClick={() =>
-                  generatePdf({ preview: true }).catch((e: any) =>
-                    setError(e?.message || "Preview PDF error")
-                  )
-                }
-                className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-100 hover:border-zinc-600 hover:bg-zinc-800"
-              >
-                Preview PDF (dev)
-              </button>
+            <p className="mt-4 text-base font-extrabold text-zinc-100">
+              {file ? file.name : "Choose Excel file"}
+            </p>
+
+            <p className="mt-1 text-sm text-zinc-500">
+              Supports .xlsx, .xls, and .csv files
+            </p>
+          </label>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+            <div className="flex flex-col gap-1">
+              <h3 className="text-lg font-extrabold text-zinc-100">
+                Vigencia Period
+              </h3>
+
+              <p className="text-sm leading-6 text-zinc-500">
+                The date range that will appear in the generated insurance
+                certificate.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold text-zinc-300">
+                  Start date
+                </span>
+
+                <input
+                  type="date"
+                  value={vigencia.inicio}
+                  onChange={(e) =>
+                    setVigencia((prev) => ({
+                      ...prev,
+                      inicio: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-teal-300/50"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-bold text-zinc-300">
+                  End date
+                </span>
+
+                <input
+                  type="date"
+                  value={vigencia.fin}
+                  onChange={(e) =>
+                    setVigencia((prev) => ({
+                      ...prev,
+                      fin: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-teal-300/50"
+                />
+              </label>
+            </div>
+
+            {!datesValid && (
+              <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
+                La fecha de inicio no puede ser posterior a la fecha de fin.
+              </p>
             )}
+          </div>
 
-            <PayAndGenerateButton
-              insurer={insurer}
-              parseToken={result?.parseToken ?? null}
-              disabled={!canGeneratePdf}
-              onGeneratePdf={(sessionId) => generatePdf({ sessionId })}
-            />
-          </>
-        )}
-
-        {file && <span className="text-sm text-zinc-400">{file.name}</span>}
-      </div>
-
-      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
-
-      {result && (
-        <div className="mt-6">
-          <p className="text-sm text-zinc-300">
-            Sheet:{" "}
-            <span className="font-semibold text-zinc-100">{result.sheetName}</span>
-            {" — "}Rows:{" "}
-            <span className="font-semibold text-zinc-100">{result.totalRows}</span>
-          </p>
-
-          {result?.detectedInsurer && (
-            <p className="mt-3 text-sm text-zinc-300">
-              Detected template:{" "}
-              <span className="font-semibold text-zinc-100">
-                {result.detectedInsurer}
-              </span>
-            </p>
-          )}
-
-          {result?.detectedInsurer && result.detectedInsurer !== insurer && (
-            <p className="mt-3 rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">
-              Wrong Excel template. You selected <b>{insurerLabel(insurer)}</b> but uploaded a{" "}
-              <b>{insurerLabel(result.detectedInsurer)}</b> file. Payment is blocked.
-            </p>
-          )}
-
-          {result.issues?.length > 0 && (
-            <>
-              <h3 className="mt-6 text-lg font-semibold text-zinc-100">
-                Issues (first 20)
-              </h3>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-300">
-                {result.issues.slice(0, 20).map((i: any, idx: number) => (
-                  <li key={idx}>
-                    Row {i.row} {i.field ? `(${i.field})` : ""}: {i.message}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          {result?.rows?.length > 0 && (
-            <>
-              <h3 className="mt-6 text-lg font-semibold text-zinc-100">
-                Preview (first 50)
-              </h3>
-
-              <div className="mt-3 overflow-auto rounded-xl border border-zinc-800 bg-zinc-950">
-                <table className="min-w-[900px] w-full border-collapse text-sm">
-                  <thead className="sticky top-0 bg-zinc-950">
-                    <tr className="border-b border-zinc-800 text-zinc-300">
-                      {previewColumns.map((col) => (
-                        <th key={col.key} className="px-3 py-3 text-left font-semibold">
-                          {col.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {result.rows.slice(0, 50).map((row: ParsedRow, idx: number) => (
-                      <tr key={idx} className="border-b border-zinc-900 text-zinc-200">
-                        {previewColumns.map((col) => (
-                          <td key={col.key} className="px-3 py-3 align-top">
-                            {renderCell(row, col.key, idx)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-zinc-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-teal-200">
+                Step 2
               </div>
-            </>
+
+              <p className="font-bold text-zinc-100">
+                {file ? "File ready to parse" : "No file selected"}
+              </p>
+
+              <p className="mt-1 text-sm text-zinc-500">
+                {file
+                  ? "Parse the file to validate the worker data."
+                  : "Upload a worker Excel file to continue."}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={parseNow}
+                disabled={!file || loading || !datesValid}
+                className="inline-flex items-center justify-center rounded-xl bg-zinc-100 px-5 py-3 text-sm font-extrabold text-zinc-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {loading ? "Parsing…" : "Parse file"}
+              </button>
+
+              {result?.rows?.length > 0 && (
+                <>
+                  {allowPreview && canGeneratePdf && (
+                    <button
+                      onClick={() =>
+                        generatePdf({ preview: true }).catch((e: any) =>
+                          setError(e?.message || "Preview PDF error")
+                        )
+                      }
+                      className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-zinc-100 transition hover:border-teal-300/40 hover:bg-white/[0.07]"
+                    >
+                      Preview PDF DEV ONLY
+                    </button>
+                  )}
+
+                  <PayAndGenerateButton
+                    insurer={insurer}
+                    parseToken={result?.parseToken ?? null}
+                    disabled={!canGeneratePdf}
+                    onGeneratePdf={(sessionId) => generatePdf({ sessionId })}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
+              {error}
+            </p>
+          )}
+
+          {result && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4">
+                  <p className="text-sm text-zinc-500">Sheet</p>
+                  <p className="mt-1 truncate font-extrabold text-zinc-100">
+                    {result.sheetName}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4">
+                  <p className="text-sm text-zinc-500">Rows</p>
+                  <p className="mt-1 font-extrabold text-zinc-100">
+                    {result.totalRows}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4">
+                  <p className="text-sm text-zinc-500">Detected template</p>
+                  <p className="mt-1 font-extrabold text-zinc-100">
+                    {result.detectedInsurer
+                      ? insurerLabel(result.detectedInsurer)
+                      : "Unknown"}
+                  </p>
+                </div>
+              </div>
+
+              {result?.detectedInsurer && result.detectedInsurer !== insurer && (
+                <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  Wrong Excel template. You selected{" "}
+                  <b>{insurerLabel(insurer)}</b> but uploaded a{" "}
+                  <b>{insurerLabel(result.detectedInsurer)}</b> file. Payment is
+                  blocked.
+                </p>
+              )}
+
+              {result.issues?.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-extrabold text-zinc-100">
+                    Issues found
+                  </h3>
+
+                  <ul className="mt-3 space-y-2 text-sm text-zinc-300">
+                    {result.issues.slice(0, 20).map((i: any, idx: number) => (
+                      <li
+                        key={idx}
+                        className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-red-300"
+                      >
+                        Row {i.row} {i.field ? `(${i.field})` : ""}: {i.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result?.rows?.length > 0 && (
+                <div className="mt-6">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h3 className="text-lg font-extrabold text-zinc-100">
+                        Data preview
+                      </h3>
+
+                      <p className="mt-1 text-sm text-zinc-500">
+                        Showing the first 50 parsed rows.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 overflow-auto rounded-2xl border border-white/10 bg-zinc-950">
+                    <table className="w-full min-w-[900px] border-collapse text-sm">
+                      <thead className="sticky top-0 bg-zinc-950">
+                        <tr className="border-b border-zinc-800 text-zinc-300">
+                          {previewColumns.map((col) => (
+                            <th
+                              key={col.key}
+                              className="px-4 py-3 text-left font-bold"
+                            >
+                              {col.label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {result.rows
+                          .slice(0, 50)
+                          .map((row: ParsedRow, idx: number) => (
+                            <tr
+                              key={idx}
+                              className="border-b border-zinc-900 text-zinc-300 transition hover:bg-white/[0.03]"
+                            >
+                              {previewColumns.map((col) => (
+                                <td
+                                  key={col.key}
+                                  className="px-4 py-3 align-top"
+                                >
+                                  {renderCell(row, col.key, idx)}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

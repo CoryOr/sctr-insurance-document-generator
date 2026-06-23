@@ -1,8 +1,15 @@
-//app/jobs/new/page.tsx
+// app/jobs/new/page.tsx
 import Link from "next/link";
 import UploadTrama from "./UploadTrama";
 
 type SP = Record<string, string | string[] | undefined>;
+
+function insurerLabel(value: string) {
+  if (value === "rimac") return "Rimac";
+  if (value === "mapfre") return "Mapfre";
+  if (value === "lapositiva") return "La Positiva";
+  return value;
+}
 
 export default async function NewJobPage({
   searchParams,
@@ -11,27 +18,43 @@ export default async function NewJobPage({
 }) {
   const sp = (await Promise.resolve(searchParams)) ?? {};
   const insurerParam = sp.insurer;
+
   const insurer = Array.isArray(insurerParam)
     ? insurerParam[0]
     : insurerParam ?? "unknown";
 
   return (
-    <main className="px-6 py-8 font-sans">
-      <Link href="/" className="text-zinc-300 hover:text-zinc-50">
-        ← Back
-      </Link>
+    <main className="relative isolate h-dvh overflow-y-auto overflow-x-hidden bg-zinc-950 px-4 py-6 font-sans text-zinc-100 sm:px-6 lg:px-8">
+      <section className="mx-auto w-full max-w-7xl pb-16">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/insurers"
+            className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold uppercase text-zinc-100 transition hover:border-teal-300/40 hover:text-white"
+          >
+            ← BACK
+          </Link>
 
-      <h1 className="mt-4 text-3xl font-extrabold tracking-tight">
-        New SCTR Job
-      </h1>
+          <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-teal-200">
+            New SCTR Job
+          </div>
+        </div>
 
-      <p className="mt-2 text-zinc-400">
-        Selected insurer: <span className="font-semibold text-zinc-200">{insurer}</span>
-      </p>
+        <div className="mt-5">
 
-      <UploadTrama insurer={insurer} />
+          <h1 className="text-4xl font-black tracking-[-0.05em] text-zinc-50 sm:text-5xl">
+            Upload worker file
+          </h1>
 
+          <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-400">
+            Selected insurer:{" "}
+            <span className="font-bold text-zinc-100">
+              {insurerLabel(insurer)}
+            </span>
+          </p>
+        </div>
+
+        <UploadTrama insurer={insurer} />
+      </section>
     </main>
   );
 }
-
