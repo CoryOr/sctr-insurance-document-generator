@@ -2,25 +2,10 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-
-const workflowSteps = [
-  {
-    number: "01",
-    title: "Upload TRAMA / Excel File",
-    description: "Import worker data for SCTR document generation.",
-  },
-  {
-    number: "02",
-    title: "Validate Insurer Data",
-    description: "The system checks required fields before document creation.",
-  },
-  {
-    number: "03",
-    title: "Generate Insurance PDFs",
-    description: "Generate clean insurance PDFs ready for review or delivery.",
-  },
-];
+import LanguageToggle from "@/components/LanguageToggle";
+import { getLang, text } from "@/lib/i18n";
 
 const insurers = [
   {
@@ -38,6 +23,11 @@ const insurers = [
 ];
 
 export default function LandingPage() {
+  const searchParams = useSearchParams();
+  const lang = getLang(searchParams.get("lang"));
+  const t = text[lang].landing;
+  const workflowSteps = t.workflowSteps;
+
   const mainRef = useRef<HTMLElement | null>(null);
   const beginRef = useRef<HTMLElement | null>(null);
   const [showButton, setShowButton] = useState(false);
@@ -75,6 +65,8 @@ export default function LandingPage() {
       ref={mainRef}
       className="relative isolate h-screen overflow-y-auto overflow-x-hidden overscroll-y-none scroll-smooth snap-y snap-mandatory bg-zinc-950 font-sans text-zinc-100"
     >
+      <LanguageToggle lang={lang} />
+
       {/* Animated background */}
       <div className="pointer-events-none fixed inset-0 z-0 animate-[hue_60s_ease-in-out_infinite]">
         <div className="absolute -top-48 left-1/4 h-[32rem] w-[32rem] rounded-full bg-violet-500/10 blur-[120px] animate-[blob_40s_ease-in-out_infinite]" />
@@ -89,25 +81,24 @@ export default function LandingPage() {
       <section className="relative z-10 mx-auto grid min-h-screen w-full max-w-7xl snap-start snap-always grid-cols-1 items-center gap-12 px-6 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-10">
         <div className="text-center lg:text-left">
           <div className="mx-auto mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-teal-200 lg:mx-0">
-            Internal Insurance Automation
+            {t.eyebrow}
           </div>
 
           <h1 className="mx-auto max-w-4xl text-5xl font-black tracking-[-0.07em] text-zinc-50 sm:text-6xl lg:mx-0 lg:text-7xl">
-            SCTR Insurance
-            <span className="block text-teal-200">Document Generator</span>
+            {t.titleA}
+            <span className="block text-teal-200">{t.titleB}</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-zinc-400 lg:mx-0">
-            Upload workers' excel files, validate construction insurance data, and
-            generate branded SCTR PDF documents for supported insurers.
+            {t.description}
           </p>
 
-          <div className="mt-9 flex items-center justify-center lg:justify-start lg:pl-45">
+          <div className="mt-9 flex items-center justify-center lg:justify-start lg:pl-[11rem]">
             <button
               onClick={scrollToBegin}
               className="rounded-full border border-zinc-700 bg-zinc-900/70 px-6 py-3 font-bold text-zinc-100 transition hover:border-teal-300/40 hover:bg-zinc-900"
             >
-              ↓ SCROLL TO BEGIN
+              {t.scroll}
             </button>
           </div>
         </div>
@@ -117,7 +108,7 @@ export default function LandingPage() {
           <div className="rounded-[1.5rem] border border-white/10 bg-zinc-950/80 p-5">
             <div>
               <h2 className="mt-1 text-2xl font-black tracking-tight">
-                How it Works?
+                {t.howItWorks}
               </h2>
             </div>
 
@@ -177,20 +168,19 @@ export default function LandingPage() {
           </div>
 
           <h2 className="text-3xl font-black tracking-tight text-zinc-50 sm:text-4xl">
-            Start a new SCTR generation
+            {t.beginTitle}
           </h2>
 
           <p className="mx-auto mt-4 max-w-xl leading-7 text-zinc-400">
-            Continue to the upload workflow, select insurer details, process the
-            worker file, and generate the final branded documents.
+            {t.beginDescription}
           </p>
 
           <div className="mt-8 flex justify-center">
             <Link
-              href="/insurers"
+              href={`/insurers?lang=${lang}`}
               className="inline-flex items-center justify-center rounded-2xl bg-zinc-100 px-10 py-5 text-lg font-extrabold text-zinc-950 shadow-sm transition hover:bg-white"
             >
-              Begin Generation
+              {t.beginButton}
             </Link>
           </div>
         </div>

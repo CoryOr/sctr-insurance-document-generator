@@ -270,10 +270,6 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
               Upload File
             </h2>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-              Choose the worker file for {insurerLabel(insurer)} and confirm the
-              PDF validity range before parsing.
-            </p>
           </div>
 
           <div className="rounded-full border border-teal-300/20 bg-teal-300/10 px-3 py-1 text-sm font-bold text-teal-200">
@@ -300,7 +296,7 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
             </div>
 
             <p className="mt-4 text-base font-extrabold text-zinc-100">
-              {file ? file.name : "Choose Excel file"}
+              {file ? file.name : "Choose Excel File"}
             </p>
 
             <p className="mt-1 text-sm text-zinc-500">
@@ -378,7 +374,7 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
               <p className="mt-1 text-sm text-zinc-500">
                 {file
                   ? "Parse the file to validate the worker data."
-                  : "Upload a worker Excel file to continue."}
+                  : "Upload excel file to continue."}
               </p>
             </div>
 
