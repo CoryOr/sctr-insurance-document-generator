@@ -1,6 +1,11 @@
 // app/insurers/page.tsx
 import Link from "next/link";
 import Image from "next/image";
+import { Suspense } from "react";
+import LanguageToggle from "@/components/LanguageToggle";
+import { getLang, text } from "@/lib/i18n";
+
+type SP = Record<string, string | string[] | undefined>;
 
 type InsurerCard = {
   key: string;
@@ -13,42 +18,54 @@ type InsurerCard = {
   };
 };
 
-const insurers: InsurerCard[] = [
-  {
-    key: "rimac",
-    name: "Rímac",
-    description: "Generate SCTR documents using Rímac.",
-    logo: {
-      src: "/pdf-assets/logos/rimac.png",
-      w: 220,
-      h: 90,
-    },
-  },
-  {
-    key: "lapositiva",
-    name: "La Positiva",
-    description: "Generate SCTR documents using La Positiva Vida.",
-    logo: {
-      src: "/pdf-assets/logos/lapositiva.png",
-      w: 240,
-      h: 90,
-    },
-  },
-  {
-    key: "mapfre",
-    name: "MAPFRE Perú",
-    description: "Generate SCTR documents using MAPFRE Perú.",
-    logo: {
-      src: "/pdf-assets/logos/mapfre_peru.png",
-      w: 260,
-      h: 90,
-    },
-  },
-];
+export default async function InsurersPage({
+  searchParams,
+}: {
+  searchParams?: SP | Promise<SP>;
+}) {
+  const sp = (await Promise.resolve(searchParams)) ?? {};
+  const lang = getLang(sp.lang);
+  const t = text[lang].insurers;
 
-export default function InsurersPage() {
+  const insurers: InsurerCard[] = [
+    {
+      key: "rimac",
+      name: "Rímac",
+      description: t.descriptions.rimac,
+      logo: {
+        src: "/pdf-assets/logos/rimac.png",
+        w: 220,
+        h: 90,
+      },
+    },
+    {
+      key: "lapositiva",
+      name: "La Positiva",
+      description: t.descriptions.lapositiva,
+      logo: {
+        src: "/pdf-assets/logos/lapositiva.png",
+        w: 240,
+        h: 90,
+      },
+    },
+    {
+      key: "mapfre",
+      name: "MAPFRE Perú",
+      description: t.descriptions.mapfre,
+      logo: {
+        src: "/pdf-assets/logos/mapfre_peru.png",
+        w: 260,
+        h: 90,
+      },
+    },
+  ];
+
   return (
     <main className="relative isolate min-h-screen overflow-hidden bg-zinc-950 px-6 py-10 font-sans text-zinc-100">
+      <Suspense fallback={null}>
+        <LanguageToggle lang={lang} />
+      </Suspense>
+
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 z-0 animate-[hue_60s_ease-in-out_infinite]">
         <div className="absolute -top-48 left-1/4 h-[32rem] w-[32rem] rounded-full bg-violet-500/10 blur-[120px] animate-[blob_40s_ease-in-out_infinite]" />
@@ -61,19 +78,17 @@ export default function InsurersPage() {
 
       <section className="relative z-10 mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-7xl flex-col">
         <div className="flex items-center justify-between gap-4">
-          <div>
+          <div className="flex items-center gap-4">
             <Link
-              href="/"
+              href={`/?lang=${lang}`}
               className="mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold text-zinc-100 transition hover:border-teal-300/40 hover:text-white"
             >
-              ← BACK
+              {t.back}
             </Link>
 
             <div className="mb-5 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-teal-200">
-              Insurer Selection
+              {t.eyebrow}
             </div>
-
-            
           </div>
         </div>
 
@@ -82,7 +97,7 @@ export default function InsurersPage() {
             {insurers.map((insurer) => (
               <Link
                 key={insurer.key}
-                href={`/jobs/new?insurer=${insurer.key}`}
+                href={`/jobs/new?insurer=${insurer.key}&lang=${lang}`}
                 aria-label={`Select ${insurer.name}`}
                 className="group flex h-[25rem] rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-2xl backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-teal-300/40 hover:bg-white/[0.08]"
               >
@@ -108,7 +123,7 @@ export default function InsurersPage() {
                     </p>
 
                     <div className="mt-auto flex w-full items-center justify-center rounded-2xl bg-zinc-100 px-5 py-3 font-extrabold text-zinc-950 transition group-hover:bg-white">
-                      Select insurer
+                      {t.selectButton}
                     </div>
                   </div>
                 </div>

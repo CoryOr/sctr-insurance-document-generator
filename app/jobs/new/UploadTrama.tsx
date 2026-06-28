@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import PayAndGenerateButton from "./PayAndGenerateButton";
+import { text, type Lang } from "@/lib/i18n";
 
 type ParsedRow = {
   __row?: string;
@@ -47,7 +48,14 @@ function formatDateForPdf(isoDate: string) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-export default function UploadTrama({ insurer }: { insurer: string }) {
+export default function UploadTrama({
+  insurer,
+  lang = "es",
+}: {
+  insurer: string;
+  lang?: Lang;
+}) {
+  const t = text[lang].upload;
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -160,7 +168,7 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
     if (!result?.rows?.length) return;
 
     if (!datesValid) {
-      setError("La fecha de inicio no puede ser posterior a la fecha de fin.");
+      setError(t.invalidDates);
       return;
     }
 
@@ -263,13 +271,12 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-teal-200">
-              Step 1
+              {t.step1}
             </div>
 
             <h2 className="text-2xl font-black tracking-tight text-zinc-50">
-              Upload File
+              {t.uploadTitle}
             </h2>
-
           </div>
 
           <div className="rounded-full border border-teal-300/20 bg-teal-300/10 px-3 py-1 text-sm font-bold text-teal-200">
@@ -296,30 +303,27 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
             </div>
 
             <p className="mt-4 text-base font-extrabold text-zinc-100">
-              {file ? file.name : "Choose Excel File"}
+              {file ? file.name : t.chooseFile}
             </p>
 
-            <p className="mt-1 text-sm text-zinc-500">
-              Supports .xlsx, .xls, and .csv files
-            </p>
+            <p className="mt-1 text-sm text-zinc-500">{t.supports}</p>
           </label>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
             <div className="flex flex-col gap-1">
               <h3 className="text-lg font-extrabold text-zinc-100">
-                Vigencia Period
+                {t.vigenciaTitle}
               </h3>
 
               <p className="text-sm leading-6 text-zinc-500">
-                The date range that will appear in the generated insurance
-                certificate.
+                {t.vigenciaDescription}
               </p>
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm font-bold text-zinc-300">
-                  Start date
+                  {t.startDate}
                 </span>
 
                 <input
@@ -337,7 +341,7 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
 
               <label className="block">
                 <span className="mb-2 block text-sm font-bold text-zinc-300">
-                  End date
+                  {t.endDate}
                 </span>
 
                 <input
@@ -356,7 +360,7 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
 
             {!datesValid && (
               <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
-                La fecha de inicio no puede ser posterior a la fecha de fin.
+                {t.invalidDates}
               </p>
             )}
           </div>
@@ -364,17 +368,15 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
           <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-zinc-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-teal-200">
-                Step 2
+                {t.step2}
               </div>
 
               <p className="font-bold text-zinc-100">
-                {file ? "File ready to parse" : "No file selected"}
+                {file ? t.fileReady : t.noFile}
               </p>
 
               <p className="mt-1 text-sm text-zinc-500">
-                {file
-                  ? "Parse the file to validate the worker data."
-                  : "Upload excel file to continue."}
+                {file ? t.fileReadyDescription : t.noFileDescription}
               </p>
             </div>
 
@@ -384,7 +386,7 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
                 disabled={!file || loading || !datesValid}
                 className="inline-flex items-center justify-center rounded-xl bg-zinc-100 px-5 py-3 text-sm font-extrabold text-zinc-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {loading ? "Parsing…" : "Parse file"}
+                {loading ? t.parsing : t.parseFile}
               </button>
 
               {result?.rows?.length > 0 && (
@@ -398,7 +400,7 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
                       }
                       className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-zinc-100 transition hover:border-teal-300/40 hover:bg-white/[0.07]"
                     >
-                      Preview PDF DEV ONLY
+                      {t.previewPdf}
                     </button>
                   )}
 
@@ -423,21 +425,23 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
             <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-sm text-zinc-500">Sheet</p>
+                  <p className="text-sm text-zinc-500">{t.sheet}</p>
                   <p className="mt-1 truncate font-extrabold text-zinc-100">
                     {result.sheetName}
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-sm text-zinc-500">Rows</p>
+                  <p className="text-sm text-zinc-500">{t.rows}</p>
                   <p className="mt-1 font-extrabold text-zinc-100">
                     {result.totalRows}
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-4">
-                  <p className="text-sm text-zinc-500">Detected template</p>
+                  <p className="text-sm text-zinc-500">
+                    {t.detectedTemplate}
+                  </p>
                   <p className="mt-1 font-extrabold text-zinc-100">
                     {result.detectedInsurer
                       ? insurerLabel(result.detectedInsurer)
@@ -448,17 +452,17 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
 
               {result?.detectedInsurer && result.detectedInsurer !== insurer && (
                 <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                  Wrong Excel template. You selected{" "}
-                  <b>{insurerLabel(insurer)}</b> but uploaded a{" "}
-                  <b>{insurerLabel(result.detectedInsurer)}</b> file. Payment is
-                  blocked.
+                  {t.wrongTemplateA} <b>{insurerLabel(insurer)}</b>{" "}
+                  {t.wrongTemplateB}{" "}
+                  <b>{insurerLabel(result.detectedInsurer)}</b>{" "}
+                  {t.wrongTemplateC}
                 </p>
               )}
 
               {result.issues?.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-lg font-extrabold text-zinc-100">
-                    Issues found
+                    {t.issuesFound}
                   </h3>
 
                   <ul className="mt-3 space-y-2 text-sm text-zinc-300">
@@ -467,7 +471,8 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
                         key={idx}
                         className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-red-300"
                       >
-                        Row {i.row} {i.field ? `(${i.field})` : ""}: {i.message}
+                        Row {i.row} {i.field ? `(${i.field})` : ""}:{" "}
+                        {i.message}
                       </li>
                     ))}
                   </ul>
@@ -479,11 +484,11 @@ export default function UploadTrama({ insurer }: { insurer: string }) {
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                       <h3 className="text-lg font-extrabold text-zinc-100">
-                        Data preview
+                        {t.dataPreview}
                       </h3>
 
                       <p className="mt-1 text-sm text-zinc-500">
-                        Showing the first 50 parsed rows.
+                        {t.dataPreviewDescription}
                       </p>
                     </div>
                   </div>

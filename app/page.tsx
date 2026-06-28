@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import LanguageToggle from "@/components/LanguageToggle";
 import { getLang, text } from "@/lib/i18n";
 
@@ -22,7 +22,7 @@ const insurers = [
   },
 ];
 
-export default function LandingPage() {
+function LandingPageContent() {
   const searchParams = useSearchParams();
   const lang = getLang(searchParams.get("lang"));
   const t = text[lang].landing;
@@ -186,5 +186,13 @@ export default function LandingPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense fallback={null}>
+      <LandingPageContent />
+    </Suspense>
   );
 }
