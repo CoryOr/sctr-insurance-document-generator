@@ -6,7 +6,7 @@ The app allows users to select an insurer, upload a worker/TRAMA spreadsheet, va
 
 ## Live Demo
 
-Demo: `https://your-vercel-demo-url.vercel.app`
+Demo: `https://sctr-insurance-document-generator.vercel.app/`
 
 For testing Stripe checkout, use Stripe test mode only:
 
