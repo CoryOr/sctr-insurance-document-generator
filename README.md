@@ -1,36 +1,160 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SCTR Insurance Document Generator
 
-## Getting Started
+A full-stack internal web application for generating branded SCTR insurance documents from worker Excel files.
 
-First, run the development server:
+The app allows users to select an insurer, upload a worker/TRAMA spreadsheet, validate the data, preview parsed rows, and generate insurer-branded PDF documents.
+
+## Live Demo
+
+Demo: `https://your-vercel-demo-url.vercel.app`
+
+For testing Stripe checkout, use Stripe test mode only:
+
+* Card: `4242 4242 4242 4242`
+* Expiration: any future date
+* CVC: any 3 digits
+
+## Screenshots
+
+### Landing Page
+
+Add screenshot here.
+
+### Insurer Selection
+
+Add screenshot here.
+
+### Upload + Validation Workflow
+
+Add screenshot here.
+
+## Features
+
+* Insurer selection workflow for Rímac, La Positiva, and MAPFRE Perú
+* Excel/TRAMA file upload and parsing
+* Insurer-specific data validation
+* PDF validity date selection
+* Parsed worker data preview
+* Branded SCTR PDF generation
+* Stripe checkout integration
+* Spanish / English language toggle
+* Responsive dark UI built with Tailwind CSS
+
+## Tech Stack
+
+* Next.js
+* React
+* TypeScript
+* Node.js
+* Tailwind CSS
+* XLSX
+* Zod
+* Playwright
+* Stripe API
+* QRCode
+* HTML/CSS
+
+## Why I Built This
+
+This project was built to automate a manual insurance document workflow. Instead of repeatedly formatting SCTR insurance documents by hand, the app parses structured worker files, validates required fields, and generates branded PDF documents for supported insurers.
+
+The goal was to reduce repetitive administrative work, improve data validation, and create a cleaner internal workflow for document generation.
+
+## Core Workflow
+
+1. Select an insurer
+2. Upload a worker Excel/TRAMA file
+3. Confirm PDF validity dates
+4. Parse and validate the file
+5. Review parsed worker rows
+6. Generate the final branded SCTR PDF
+
+## Local Development
+
+Clone the repository:
+
+```bash
+git clone https://github.com/CoryOr/sctr-insurance-document-generator.git
+cd sctr-insurance-document-generator
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```txt
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Variables
 
-## Learn More
+Create a `.env.local` file with the required values.
 
-To learn more about Next.js, take a look at the following resources:
+```env
+STRIPE_SECRET_KEY=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_ALLOW_PDF_PREVIEW=
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Do not commit `.env.local`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```txt
+app/
+  page.tsx
+  insurers/
+    page.tsx
+  jobs/
+    new/
+      page.tsx
+      UploadTrama.tsx
+      PayAndGenerateButton.tsx
+  api/
+    parse-trama/
+    generate-pdf/
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+components/
+  LanguageToggle.tsx
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+lib/
+  i18n.ts
+
+public/
+  pdf-assets/
+```
+
+## What I Learned
+
+* Building full-stack workflows with the Next.js App Router
+* Handling file uploads and spreadsheet parsing
+* Creating validation flows for insurer-specific templates
+* Managing server-side PDF generation
+* Integrating Stripe checkout with protected document generation
+* Designing a bilingual UI with reusable translation data
+* Improving UX for internal tools and form-heavy workflows
+
+## Future Improvements
+
+* Add authenticated admin users
+* Store generation history
+* Add downloadable sample Excel files
+* Add more insurer templates
+* Improve automated testing coverage
+* Add audit logs for generated documents
