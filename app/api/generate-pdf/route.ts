@@ -1,6 +1,7 @@
 // app/api/generate-pdf/route.ts
 import { deliverToInsurer } from "@/lib/delivery/deliverToInsurer";
-import { chromium } from "playwright";
+import chromium from "@sparticuz/chromium";
+import { chromium as playwrightChromium } from "playwright-core";
 import { renderTemplate } from "@/lib/pdf/templates";
 import fs from "fs/promises";
 import path from "path";
@@ -9,6 +10,24 @@ import QRCode from "qrcode";
 import { verifyParseGuard } from "@/lib/parse-guard";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
+
+async function launchPdfBrowser() {
+  const isVercel = process.env.VERCEL === "1";
+
+  if (isVercel) {
+    return playwrightChromium.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    });
+  }
+
+  return playwrightChromium.launch({
+    channel: "chrome",
+    headless: true,
+  });
+}
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecret ? new Stripe(stripeSecret) : null;
@@ -177,7 +196,7 @@ export async function POST(req: Request) {
 
     const html = renderTemplate(insurer, { insurer, company, rows, assets });
 
-    const browser = await chromium.launch();
+    const browser = await launchPdfBrowser();
     try {
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: "load" });
