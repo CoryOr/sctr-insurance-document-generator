@@ -43,6 +43,7 @@ For testing Stripe checkout, use Stripe test mode only:
 * Stripe checkout integration
 * Spanish / English language toggle
 * Responsive dark UI built with Tailwind CSS
+* Backend insurer email delivery: automatically forwards the uploaded Excel/TRAMA file to the correct insurer inbox after successful payment and PDF generation
 
 ## Tech Stack
 
@@ -153,12 +154,12 @@ public/
 * Integrating Stripe checkout with protected document generation
 * Designing a bilingual UI with reusable translation data
 * Improving UX for internal tools and form-heavy workflows
+* Automated a full backend workflow connecting PDF generation, payment verification, and insurer email delivery.
 
 ## Future Improvements
 
 * Add authenticated admin users
 * Store generation history
-* Add downloadable sample Excel files
 * Add more insurer templates
 * Improve automated testing coverage
 * Add audit logs for generated documents
