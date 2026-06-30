@@ -16,17 +16,21 @@ For testing Stripe checkout, use Stripe test mode only:
 
 ## Screenshots
 
-### Landing Page
+### Landing Page — Spanish
 
-Add screenshot here.
+![Landing Page Spanish](public/screenshots/landing-es.png)
+
+### Landing Page — English
+
+![Landing Page English](public/screenshots/landing-en.png)
 
 ### Insurer Selection
 
-Add screenshot here.
+![Insurer Selection](public/screenshots/insurer-selection-es.png)
 
-### Upload + Validation Workflow
+### Upload Workflow
 
-Add screenshot here.
+![Upload Workflow](public/screenshots/workflow-es.png)
 
 ## Features
 
