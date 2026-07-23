@@ -1,6 +1,13 @@
-import { baseCss, esc, footerWatermark, rosterTable } from "./base";
+// note: I haven't worked with protecta yet so this is not important.
 
-export function renderProtecta({ insurer, company, rows }: any) {
+import { baseCss, esc, footerWatermark, rosterTable } from "./base";
+import type { PdfTemplateData } from "./types";
+
+export function renderProtecta({
+  insurer = "",
+  company = {},
+  rows = [],
+}: PdfTemplateData) {
   return `<!doctype html>
 <html>
 <head>

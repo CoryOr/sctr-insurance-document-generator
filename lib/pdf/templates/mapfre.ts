@@ -1,7 +1,33 @@
 // lib/pdf/templates/mapfre.ts
-import { baseCss, esc, footerWatermark } from "./base";
+/**
+ * MAPFRE SCTR PDF template for the SCTR Insurance Document Generator.
+ *
+ * This module renders the insurer-specific two-page HTML certificate used for
+ * MAPFRE SCTR documents. The PDF-generation route loads the returned HTML in
+ * Chromium and prints it as an A4 PDF.
+ *
+ * Responsibilities:
+ * - Normalize employee names and optional company fields.
+ * - Render MAPFRE branding, certificate details, QR verification, and seals.
+ * - Build the insured-person roster from validated workbook rows.
+ * - Render the second-page issue, signature, coverage, and legal sections.
+ * - Escape dynamic company and employee values before inserting them into HTML.
+ */
 
-function fullNameMapfre(r: any) {
+import { baseCss, esc, footerWatermark } from "./base";
+import type {PdfAssets, PdfRow, PdfTemplateData } from "./types";
+
+/**
+ * Builds the employee name displayed in the MAPFRE insured-person roster.
+ *
+ * A precombined `nombrecompleto` value takes precedence. Otherwise, the
+ * function joins the paternal surname, maternal surname, and given names while
+ * removing empty values and repeated whitespace.
+ *
+ * @param r - Parsed employee row.
+ * @returns The normalized full name.
+ */
+function fullNameMapfre(r: PdfRow) {
   const nombreCompleto = String(r.nombrecompleto ?? "").trim();
   if (nombreCompleto) return nombreCompleto;
 
@@ -13,7 +39,17 @@ function fullNameMapfre(r: any) {
     .trim();
 }
 
-function qrMarkup(assets: any) {
+/**
+ * Renders the document-verification QR code.
+ *
+ * SVG markup is embedded directly when supplied by the QR generator. Other
+ * values are rendered as image sources. A fixed-size placeholder preserves the
+ * header layout when no QR asset is available.
+ *
+ * @param assets - Embedded assets supplied to the template.
+ * @returns HTML markup for the QR code or its placeholder.
+ */
+function qrMarkup(assets: PdfAssets) {
   if (!assets.qr) return `<div class="qrPh"></div>`;
 
   const qr = String(assets.qr ?? "").trim();
@@ -25,18 +61,43 @@ function qrMarkup(assets: any) {
   return `<img class="qr" src="${qr}" alt="QR" />`;
 }
 
-function sealImg(assets: any) {
+/**
+ * Renders the MAPFRE seal or a layout-preserving placeholder.
+ *
+ * @param assets - Embedded assets supplied to the template.
+ * @returns HTML markup for the insurer seal.
+ */
+function sealImg(assets: PdfAssets) {
   return assets.mapfreSeal
     ? `<img class="seal" src="${assets.mapfreSeal}" alt="MAPFRE seal" />`
     : `<div class="sealPh"></div>`;
 }
 
 
-export function renderMapfre(data: any) {
+/**
+ * Renders a MAPFRE SCTR certificate as a complete two-page HTML document.
+ *
+ * Expected input sections:
+ * - `assets`: MAPFRE logo, seal, signature, and QR assets.
+ * - `company`: Certificate, policy, validity, issue, and signer information.
+ * - `rows`: Parsed employees included in the insured-person roster.
+ *
+ * @param data - Template data assembled by the PDF-generation route.
+ * @returns A self-contained HTML document ready for Chromium PDF rendering.
+ */
+export function renderMapfre(data: PdfTemplateData) {
+  /*
+   * Normalize optional input sections so missing values do not interrupt
+   * template rendering.
+   */
   const assets = data.assets ?? {};
   const company = data.company ?? {};
   const rows = Array.isArray(data.rows) ? data.rows : [];
 
+  /*
+   * Resolve the main certificate and policy values used on the first page.
+   * The certificate number supports both the current and legacy property names.
+   */
   const constanciaNro = company.constanciaNro ?? company.constancia ?? "MP/____/________";
   const empresa = company.empresa ?? "";
   const polizaPension = company.polizaPension ?? "";
@@ -44,13 +105,17 @@ export function renderMapfre(data: any) {
   const vigIni = company.vigenciaInicio ?? "";
   const vigFin = company.vigenciaFin ?? "";
 
+  /*
+   * Resolve the issue and signer fields displayed on the second page.
+   */
   // Page 2 fields
   const emitidoParaFines = company.emitidoTexto ?? "Se expide la presente, para fines que consideren conveniente.";
   const emisionFechaHora = company.emisionFechaHora ?? ""; // e.g. "29/10/2025 06:08:03 pm"
   const emitidoPor = company.emitidoPor ?? "";             // e.g. "Echegaray Reyes, Enmanuel"
-  const signerName = company.signerName ?? "ISAAC RAMIREZ MOLINA";
-  const signerRole = company.signerRole ?? "UNIDAD DE RIESGOS DEL TRABAJO";
 
+  /*
+   * Build the reusable MAPFRE header shown at the top of both PDF pages.
+   */
   const header = `
     <div class="hdr">
       <div class="hdrLeft">
@@ -75,13 +140,20 @@ export function renderMapfre(data: any) {
     </div>
   `;
 
+  /*
+   * Build the insured-person roster from the validated workbook rows.
+   */
   const asegurados = `
   <div class="asegBlock">
     <div class="asegTitle">ASEGURADO(S)</div>
     <table class="asegTable">
       <tbody>
         ${rows
-          .map((r: any, i: number) => {
+          .map((r, i) => {
+            /*
+             * Normalize the document type, number, and uppercase display name
+             * before escaping them into the roster row.
+             */
             const tipo = (r.tipodoc ?? "DNI").toString().trim() || "DNI";
             const doc = (r.nrodoc ?? "").toString().trim();
             const name = fullNameMapfre(r).toUpperCase();
@@ -100,7 +172,11 @@ export function renderMapfre(data: any) {
   </div>
 `;
 
-return `<!doctype html>
+  /*
+   * Combine the shared header, first-page roster, second-page authorization
+   * content, and fixed footer watermark into one printable HTML document.
+   */
+  return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />

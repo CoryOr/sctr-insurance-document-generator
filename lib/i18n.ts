@@ -1,12 +1,54 @@
+/**
+ * Internationalization definitions for the SCTR Insurance Document Generator.
+ *
+ * This module centralizes the application's supported languages and all
+ * user-facing copy used by the landing page, insurer-selection page, new-job
+ * workflow, and Excel upload interface.
+ *
+ * Responsibilities:
+ * - Define the supported language codes.
+ * - Normalize language values received from URL query parameters.
+ * - Provide Spanish and English translations through a shared object.
+ *
+ * Page components access translations with patterns such as:
+ * `text[lang].landing`, `text[lang].insurers`, and `text[lang].upload`.
+ */
+
+/**
+ * Language codes currently supported by the application.
+ */
 export type Lang = "es" | "en";
 
+/**
+ * Normalizes a URL language parameter into a supported application language.
+ *
+ * Query parameters may arrive as a string, an array of strings, or a missing
+ * value. English is selected only when the resolved value is exactly `"en"`;
+ * every other value falls back to Spanish.
+ *
+ * @param value - Raw language value received from the URL or router.
+ * @returns A supported application language code.
+ */
 export function getLang(value?: string | string[] | null): Lang {
   const v = Array.isArray(value) ? value[0] : value;
   return v === "en" ? "en" : "es";
 }
 
+/**
+ * Localized application copy grouped first by language and then by page or
+ * workflow section.
+ *
+ * The Spanish and English objects intentionally share the same property shape
+ * so components can switch languages without changing their rendering logic.
+ */
 export const text = {
+  /**
+   * Spanish application copy.
+   */
   es: {
+    /**
+     * Landing-page headings, descriptions, calls to action, and workflow steps.
+     */
     landing: {
       eyebrow: "Automatización interna de seguros",
       titleA: "Generador de",
@@ -19,6 +61,10 @@ export const text = {
       beginDescription:
         "Continúa al flujo de carga, selecciona los detalles de la aseguradora, procesa el archivo de trabajadores y genera los documentos finales.",
       beginButton: "Comenzar generación",
+
+      /**
+       * Ordered steps shown in the landing-page workflow preview.
+       */
       workflowSteps: [
         {
           number: "01",
@@ -40,6 +86,9 @@ export const text = {
       ],
     },
 
+    /**
+     * Insurer-selection page labels and insurer-specific descriptions.
+     */
     insurers: {
       back: "← VOLVER",
       eyebrow: "Selección de aseguradora",
@@ -51,6 +100,9 @@ export const text = {
       },
     },
 
+    /**
+     * New-job page labels displayed before the upload workflow.
+     */
     jobs: {
       back: "← VOLVER",
       eyebrow: "Nuevo trabajo SCTR",
@@ -58,6 +110,9 @@ export const text = {
       selectedInsurer: "Aseguradora seleccionada:",
     },
 
+    /**
+     * Excel upload, validity-period, parsing, validation, and preview labels.
+     */
     upload: {
       step1: "Paso 1",
       uploadTitle: "Cargar archivo",
@@ -92,7 +147,13 @@ export const text = {
     },
   },
 
+  /**
+   * English application copy.
+   */
   en: {
+    /**
+     * Landing-page headings, descriptions, calls to action, and workflow steps.
+     */
     landing: {
       eyebrow: "Internal Insurance Automation",
       titleA: "SCTR Insurance",
@@ -105,6 +166,10 @@ export const text = {
       beginDescription:
         "Continue to the upload workflow, select insurer details, process the worker file, and generate the final branded documents.",
       beginButton: "Begin Generation",
+
+      /**
+       * Ordered steps shown in the landing-page workflow preview.
+       */
       workflowSteps: [
         {
           number: "01",
@@ -126,6 +191,9 @@ export const text = {
       ],
     },
 
+    /**
+     * Insurer-selection page labels and insurer-specific descriptions.
+     */
     insurers: {
       back: "← BACK",
       eyebrow: "Insurer Selection",
@@ -137,6 +205,9 @@ export const text = {
       },
     },
 
+    /**
+     * New-job page labels displayed before the upload workflow.
+     */
     jobs: {
       back: "← BACK",
       eyebrow: "New SCTR Job",
@@ -144,6 +215,9 @@ export const text = {
       selectedInsurer: "Selected insurer:",
     },
 
+    /**
+     * Excel upload, validity-period, parsing, validation, and preview labels.
+     */
     upload: {
       step1: "Step 1",
       uploadTitle: "Upload File",

@@ -1,7 +1,38 @@
-// lib/pdf/templates/lapositiva.ts
-import { esc, baseCss, footerWatermark } from "./shared";
+/**
+ * La Positiva SCTR PDF template for the SCTR Insurance Document Generator.
+ *
+ * This module renders the insurer-specific HTML certificate used for La
+ * Positiva SCTR pension and health documents. The PDF-generation route loads
+ * the returned HTML in Chromium and prints it as an A4 PDF.
+ *
+ * Responsibilities:
+ * - Normalize optional company, asset, and employee-row data.
+ * - Apply La Positiva-specific print layout and styling.
+ * - Embed insurer logos and authorized signature images.
+ * - Render policy, validity-period, workplace, and employee information.
+ * - Escape dynamic values before inserting them into generated HTML.
+ * - Include the insurer's legal notes and shared footer watermark.
+ */
 
-export function renderLaPositiva(data: any) {
+import { esc, baseCss, footerWatermark } from "./shared";
+import type { PdfTemplateData } from "./types";
+
+/**
+ * Renders a La Positiva SCTR certificate as a complete HTML document.
+ *
+ * Expected input sections:
+ * - `assets`: Embedded logo and signature image data URIs.
+ * - `company`: Company, policy, validity-period, and signer information.
+ * - `rows`: Parsed employee records included in the insured-personnel table.
+ *
+ * @param data - Template data assembled by the PDF-generation route.
+ * @returns A self-contained HTML document ready for Chromium PDF rendering.
+ */
+export function renderLaPositiva(data: PdfTemplateData) {
+  /*
+   * Normalize optional input sections so missing values do not cause template
+   * rendering errors.
+   */
   const assets = data.assets ?? {};
   const company = data.company ?? {};
   const rows = Array.isArray(data.rows) ? data.rows : [];
@@ -10,13 +41,24 @@ export function renderLaPositiva(data: any) {
 <html>
 <head>
   <meta charset="utf-8" />
+
+  <!-- Shared print styles used by the insurer PDF templates. -->
   ${baseCss()}
+
   <style>
+    /*
+     * La Positiva-specific A4 dimensions. The browser's default body margin is
+     * removed so the certificate aligns with the insurer reference layout.
+     */
     @page { size: A4; margin: 11mm 12mm 12mm 12mm; }
     body { margin: 0; } /* also remove browser default 8px margin */
 
     body { font-family: Helvetica; font-size: 11pt; color: #111; }
 
+    /*
+     * Adjustable positioning variables for logos and signatures. These values
+     * can be tuned without changing the document structure.
+     */
     :root{
       --logoLeftX: 0mm;
       --logoLeftY: 0mm;
@@ -31,6 +73,7 @@ export function renderLaPositiva(data: any) {
       --sigRowTop: 5mm;   /* space above the whole signature row */
     }
 
+    /* Two-logo insurer header. */
     .logos { display:flex; justify-content:space-between; align-items:flex-start; }
     .logoLeft{
       height: var(--logoLeftH, 70px);
@@ -45,10 +88,12 @@ export function renderLaPositiva(data: any) {
       transform: translate(var(--logoRightX, 0mm), var(--logoRightY, 0mm));
     }
 
+    /* Issue location/date and insurer reference row. */
     .topbar { display:flex; justify-content:space-between; align-items:flex-start; margin-top: 6px; }
     .topbar .left { font-size: 11pt; }
     .topbar .right { font-size: 11pt; }
 
+    /* Certificate heading and company summary. */
     .center { text-align:center; }
     .title { margin-top: 8pt; font-size: 18pt; font-weight: 800; letter-spacing: .5px; }
     .subtitle { margin-top: 2pt; font-size: 10pt; font-weight: 400; }
@@ -83,7 +128,10 @@ export function renderLaPositiva(data: any) {
     .sectionTitle { margin-top: 12px; font-weight: 800; text-transform: uppercase; }
     .sedeLine { margin-top: 6px; margin-bottom: 2mm; }
 
-    /* Table */
+    /*
+     * Fixed-layout employee table. Individual borders are selectively drawn to
+     * avoid doubled borders around the table perimeter.
+     */
     table.roster{
       width: 92%;
       margin: 0 auto;
@@ -93,7 +141,7 @@ export function renderLaPositiva(data: any) {
       border: 0.8pt solid #111;
       font-size: 9pt;
     }
-      
+
     table.roster th,
     table.roster td{
       padding: 1.5pt 3pt; /* tighter rows */
@@ -105,7 +153,7 @@ export function renderLaPositiva(data: any) {
       border-right: 0.6pt solid #111; /* draw grid lines */
       border-bottom: 0.6pt solid #111;
     }
-    
+
     table.roster th{
       font-weight: 800;
       text-transform: uppercase;
@@ -129,14 +177,19 @@ export function renderLaPositiva(data: any) {
 
     .extend { margin-top: 10px; }
 
+    /*
+     * Signature images and signer details are arranged in two equal columns.
+     * Placeholder space preserves alignment when an image is unavailable.
+     */
     .sigRow{ margin-top: var(--sigRowTop); display:flex; justify-content: space-between; gap: 20px; break-inside: avoid; }
     .sigBox { width: 48%; text-align: center; }
     .sigBox b { font-weight: 400; } /* only affects name */
     .sigImg{ height: var(--sigH); width: auto; object-fit: contain; display:block; margin: 0 auto var(--sigGap); /* <-- adds spacing below the image */ }
     .sigSpace{ height: var(--sigH); margin-bottom: var(--sigGap); /* keep same spacing even if no image */ }
-    
+
     /* .sigLine{ margin: 0 auto 3mm; width: 70%; border-top: 1px solid #777; } */
 
+    /* Legal notes and policy conditions. */
     .noteTitle { margin-top: 14px; font-weight: 400; text-decoration: underline; }
     .noteText { margin-top: 6px; font-size: 10pt; line-height: 1.35; font-weight: 400 }
     .noteText p { margin: 0 0 8pt 0; }   /* spacing between paragraphs */
@@ -147,6 +200,10 @@ export function renderLaPositiva(data: any) {
 </head>
 
 <body>
+  <!--
+    Render both insurer logos when available. Empty placeholders preserve the
+    header height when either image cannot be loaded.
+  -->
   <div class="logos">
     ${
       assets.insurerLogo
@@ -161,11 +218,13 @@ export function renderLaPositiva(data: any) {
     }
   </div>
 
+  <!-- Certificate issue information. -->
   <div class="topbar">
     <div class="left">${esc(company.emisionLugar ?? "Miraflores")}, ${esc(company.emisionFecha ?? "")}</div>
     <div class="right">T.P: / T.S:</div>
   </div>
 
+  <!-- Certificate title, company name, validity period, and activity. -->
   <div class="center">
     <div class="title">CONSTANCIA</div>
     <div class="subtitle">SEGURO COMPLEMENTARIO DE TRABAJO DE RIESGO PENSION Y SALUD</div>
@@ -177,11 +236,13 @@ export function renderLaPositiva(data: any) {
     </div>
   </div>
 
+  <!-- Standard SCTR coverage declaration. -->
   <div class="desc">
     Por medio del presente dejamos constancia que los asegurados detallados líneas abajo, conforme al Decreto Supremo
     003-98-SA, se encuentran amparados bajo la cobertura de pensión y salud.
   </div>
 
+  <!-- Pension policy and health-contract identifiers. -->
   <table class="policyTable">
     <tr>
       <td>SCTR PENSIONES Póliza ${esc(company.polizaPension ?? "")}</td>
@@ -192,6 +253,7 @@ export function renderLaPositiva(data: any) {
   <div class="sectionTitle">PERSONAL ASEGURADO</div>
   <div class="sedeLine">SEDE: ${esc(company.sede ?? "")}</div>
 
+  <!-- Insured-worker roster generated from the validated workbook rows. -->
   <table class="roster">
     <colgroup>
       <col style="width:6%">
@@ -214,7 +276,7 @@ export function renderLaPositiva(data: any) {
     </thead>
 
     <tbody>
-      ${rows.map((r: any, i: number) => `
+      ${rows.map((r, i) => `
         <tr>
           <td style="text-align:center;">${i + 1}</td>
           <td>${esc(r.nombres)}</td>
@@ -227,10 +289,12 @@ export function renderLaPositiva(data: any) {
     </tbody>
   </table>
 
+  <!-- Statement identifying the requesting customer. -->
   <div class="extend">
     Extendemos la presente constancia a solicitud de nuestro cliente: ${esc(company.empresa ?? "")}
   </div>
 
+  <!-- Authorized La Positiva Vida and La Positiva EPS signers. -->
   <div class="sigRow">
     <div class="sigBox">
       ${assets.sig1 ? `<img class="sigImg" src="${assets.sig1}" alt="firma 1" />` : `<div class="sigSpace"></div>`}
@@ -249,6 +313,7 @@ export function renderLaPositiva(data: any) {
     </div>
   </div>
 
+  <!-- Subscription, validity, and occupational-safety conditions. -->
   <div class="noteTitle">Nota:</div>
   <div class="noteText">
     <p>El presente documento está sujeto a la política de suscripción de la Compañía y queda sin efecto en caso que el cliente
@@ -266,6 +331,7 @@ export function renderLaPositiva(data: any) {
     Ocupacionales de los asegurados</p>
   </div>
 
+  <!-- SCTR pension guarantee clause. -->
   <div class="noteText" style="margin-top:6px; font-weight:800;">
     Cláusula Garantía (SCTR Pensión)
   </div>
@@ -278,8 +344,10 @@ export function renderLaPositiva(data: any) {
     <p>MARGARCIA</p>
   </div>
 
+  <!-- Optional internal or policy reference code. -->
   <div style="margin-top: 18px; font-size: 10px;">${esc(company.codigo ?? "")}</div>
 
+  <!-- Shared footer watermark. -->
   ${footerWatermark("Cactus Jack")}
 </body>
 </html>`;

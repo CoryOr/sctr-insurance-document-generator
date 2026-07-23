@@ -1,13 +1,48 @@
-// lib/pdf/templates/rimac.ts
-import { baseCss, esc, footerWatermark } from "./base";
+/**
+ * RIMAC SCTR PDF template for the SCTR Insurance Document Generator.
+ *
+ * This module renders the insurer-specific HTML certificate used for RIMAC
+ * SCTR health documents. The PDF-generation route loads the returned HTML in
+ * Chromium and prints it as an A4 PDF.
+ *
+ * Responsibilities:
+ * - Normalize optional company, asset, and employee-row data.
+ * - Build complete employee names from available workbook fields.
+ * - Apply the RIMAC-specific certificate layout and print styling.
+ * - Render policy, validity-period, workplace, and insured-person information.
+ * - Embed the RIMAC logo and authorized signature image when available.
+ * - Escape dynamic values before inserting them into generated HTML.
+ */
 
+import { baseCss, esc, footerWatermark } from "./base";
+import type { PdfRow, PdfTemplateData } from "./types";
+
+/**
+ * Converts an unknown value into a trimmed string.
+ *
+ * @param v - Value to normalize.
+ * @returns A trimmed string, or an empty string for nullish values.
+ */
 function clean(v: unknown) {
   return String(v ?? "").trim();
 }
 
-function fullNameRimac(r: any) {
+/**
+ * Resolves the complete worker name used by the RIMAC certificate.
+ *
+ * A precombined `nombrecompleto` value takes priority. Otherwise, the function
+ * joins the paternal surname, maternal surname, and given names while removing
+ * empty values and duplicate whitespace.
+ *
+ * @param r - Parsed employee record.
+ * @returns The normalized complete employee name.
+ */
+function fullNameRimac(r: PdfRow) {
   const nombreCompleto = clean(r.nombrecompleto);
-  if (nombreCompleto) return nombreCompleto;
+
+  if (nombreCompleto) {
+    return nombreCompleto;
+  }
 
   return [r.paterno, r.materno, r.nombres]
     .map(clean)
@@ -17,11 +52,30 @@ function fullNameRimac(r: any) {
     .trim();
 }
 
-export function renderRimac(data: any) {
+/**
+ * Renders a RIMAC SCTR certificate as a complete HTML document.
+ *
+ * Expected input sections:
+ * - `assets`: Embedded RIMAC logo and signature image data URIs.
+ * - `company`: Company, policy, issue, validity-period, site, and signer data.
+ * - `rows`: Parsed employee records included in the personnel table.
+ *
+ * @param data - Template data assembled by the PDF-generation route.
+ * @returns A self-contained HTML document ready for Chromium PDF rendering.
+ */
+export function renderRimac(data: PdfTemplateData) {
+  /*
+   * Normalize optional top-level sections so missing values do not cause
+   * property-access errors during template rendering.
+   */
   const assets = data.assets ?? {};
   const company = data.company ?? {};
   const rows = Array.isArray(data.rows) ? data.rows : [];
 
+  /*
+   * Resolve certificate, issue, company, policy, validity, site, user, and
+   * signer fields from the available company-data aliases.
+   */
   const codigo = clean(company.codigo || company.constanciaCodigo);
   const lugar = clean(company.emisionLugar || "Miraflores");
   const fechaLarga = clean(company.emisionFechaLarga);
@@ -33,9 +87,16 @@ export function renderRimac(data: any) {
   const vigIni = clean(company.vigenciaInicio);
   const vigFin = clean(company.vigenciaFin);
 
+  /*
+   * Use the first parsed worker's site when the company-level site is missing.
+   */
   const sede = clean(company.sede || rows[0]?.sede);
   const usuario = clean(company.usuario);
 
+  /*
+   * Apply the configured signer details, falling back to the default RIMAC
+   * representative values used by the current certificate format.
+   */
   const firmanteNombre = clean(
     company.firmanteNombre || "Roberto Carlos León Gavonel"
   );
@@ -48,14 +109,22 @@ export function renderRimac(data: any) {
 <html>
 <head>
   <meta charset="utf-8" />
+
   <style>
+    /* Shared print, typography, and footer styles. */
     ${baseCss()}
 
+    /*
+     * RIMAC-specific A4 page margins.
+     */
     @page {
       size: A4;
       margin: 8mm 20mm 10mm 20mm;
     }
 
+    /*
+     * Remove browser defaults and preserve exact print colors.
+     */
     html,
     body {
       margin: 0;
@@ -71,6 +140,7 @@ export function renderRimac(data: any) {
       background: #fff !important;
     }
 
+    /* Header containing the logo, certificate code, place, date, and time. */
     .top {
       display: flex;
       justify-content: space-between;
@@ -109,6 +179,7 @@ export function renderRimac(data: any) {
       font-weight: 500;
     }
 
+    /* Main certificate headings and descriptive text. */
     .title {
       margin-top: 9mm;
       text-align: center;
@@ -152,6 +223,10 @@ export function renderRimac(data: any) {
       font-weight: 500;
     }
 
+    /*
+     * Insured-person table. The border rules intentionally reproduce the
+     * heavier grid used by the RIMAC reference certificate.
+     */
     table.roster {
       width: 100%;
       border-collapse: collapse;
@@ -162,7 +237,7 @@ export function renderRimac(data: any) {
       border: 2px solid #111;
       border-right: 2px solid #111;
     }
-    
+
     table.roster th:last-child,
     table.roster td:last-child {
       border-right: 2px solid #111 !important;
@@ -187,6 +262,7 @@ export function renderRimac(data: any) {
       padding: 6px 5px;
     }
 
+    /* Fixed column widths for row number, name, document type, and number. */
     .cN {
       width: 8%;
       text-align: center;
@@ -216,6 +292,9 @@ export function renderRimac(data: any) {
       text-align: center;
     }
 
+    /*
+     * Optional site row displayed above the worker entries.
+     */
     .sedeRow td {
       font-size: 12pt;
       font-weight: 500;
@@ -228,6 +307,9 @@ export function renderRimac(data: any) {
       font-size: 10pt;
     }
 
+    /*
+     * Bottom section containing the issuing user and authorized signature.
+     */
     .bottom {
       margin-top: 9mm;
       display: flex;
@@ -279,6 +361,7 @@ export function renderRimac(data: any) {
 
 <body>
   <div class="page">
+    <!-- RIMAC logo, certificate code, and issue details. -->
     <div class="top">
       <div class="leftTop">
         ${assets.rimacLogo ? `<img class="logo" src="${assets.rimacLogo}" alt="RIMAC" />` : ``}
@@ -291,12 +374,14 @@ export function renderRimac(data: any) {
       </div>
     </div>
 
+    <!-- Certificate heading and contracting company. -->
     <div class="title">CONSTANCIA</div>
 
     <div class="p">Por medio de la presente, dejamos constancia que los Señores:</div>
 
     <div class="empresa">${esc(empresa)}</div>
 
+    <!-- Standard RIMAC SCTR health-policy declaration. -->
     <div class="p">
       De acuerdo a lo establecido en el Decreto Supremo 003-98-SA – Normas Técnicas del Seguro Complementario
       de Trabajo de Riesgo, a la fecha han contratado con Rimac S.A. Entidad Prestadora de Salud la(s) póliza(s) de
@@ -306,6 +391,7 @@ export function renderRimac(data: any) {
     <div class="midPolicy">SCTR SALUD&nbsp; N° ${esc(polizaSalud)}</div>
     <div class="midRenewable">La constancia es de vigencia mensual y es renovable</div>
 
+    <!-- Validity period and insured-person introduction. -->
     <div class="p">
       La presente constancia tiene vigencia desde ${esc(vigIni)} hasta ${esc(vigFin)}. A solicitud de la empresa contratante
       se emite la presente Constancia detallando a continuación el personal que se encuentra afiliado a la(s) póliza(s)
@@ -314,6 +400,7 @@ export function renderRimac(data: any) {
 
     <div class="relTitle">RELACION DE PERSONAL:</div>
 
+    <!-- Insured-person table generated from the validated workbook rows. -->
     <table class="roster">
       <thead>
         <tr>
@@ -325,7 +412,10 @@ export function renderRimac(data: any) {
       <tbody>
         ${sede ? `<tr class="sedeRow"><td colspan="4">SEDE : ${esc(sede)}</td></tr>` : ``}
 
-        ${rows.map((r: any, i: number) => {
+        ${rows.map((r, i) => {
+          /*
+           * RIMAC prints employee names and document types in uppercase.
+           */
           const name = fullNameRimac(r).toUpperCase();
           const tipo = clean(r.tipodoc || "DNI").toUpperCase();
           const doc = clean(r.nrodoc);
@@ -342,10 +432,12 @@ export function renderRimac(data: any) {
       </tbody>
     </table>
 
+    <!-- Standard purpose statement printed below the worker list. -->
     <div class="footLine">
       Se expide la presente a solicitud del Asegurado/Contratante para los fines que estime convenientes.
     </div>
 
+    <!-- Issuing user and authorized RIMAC signer. -->
     <div class="bottom">
       <div class="usuario">${usuario ? `Usuario :&nbsp;&nbsp;&nbsp; ${esc(usuario)}` : ``}</div>
 
@@ -358,6 +450,7 @@ export function renderRimac(data: any) {
     </div>
   </div>
 
+  <!-- Shared fixed footer watermark. -->
   ${footerWatermark?.() ?? ""}
 </body>
 </html>`;

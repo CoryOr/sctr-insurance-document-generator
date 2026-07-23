@@ -1,10 +1,33 @@
 // app/jobs/new/UploadTrama.tsx
+/**
+ * Excel upload, validation, payment, and PDF-generation workflow for a new
+ * SCTR insurance document.
+ *
+ * This client component coordinates the main user-facing workflow after an
+ * insurer has been selected:
+ * - Accept an insurer-specific Excel workbook.
+ * - Collect and validate the policy coverage period (`vigencia`).
+ * - Send the workbook to the parsing API for template and row validation.
+ * - Display detected template information, issues, and a data preview.
+ * - Allow local PDF previews when the public preview flag is enabled.
+ * - Start Stripe Checkout and generate the final paid PDF.
+ * - Include the original workbook when requesting PDF generation so it can be
+ *   delivered to the selected insurer.
+ */
+
 "use client";
 
 import { useMemo, useState } from "react";
 import PayAndGenerateButton from "./PayAndGenerateButton";
 import { text, type Lang } from "@/lib/i18n";
+import { getErrorMessage } from "@/lib/getErrorMessage";
 
+/**
+ * Normalized employee row returned by the Excel parsing endpoint.
+ *
+ * Fields are optional because each insurer template exposes a different set of
+ * columns and incomplete rows may still be returned with validation issues.
+ */
 type ParsedRow = {
   __row?: string;
   nombres?: string;
@@ -18,18 +41,58 @@ type ParsedRow = {
   remuneracion?: string;
   tipotrab?: string;
   sede?: string;
+  [key: string]: string | undefined;
 };
 
+/**
+ * Policy coverage period stored in the ISO format expected by HTML date inputs.
+ */
 type Vigencia = {
   inicio: string;
   fin: string;
 };
 
+type ParseIssue = {
+  row: number;
+  field?: string;
+  message: string;
+};
+
+type ParseResult = {
+  insurer?: string;
+  detectedInsurer?: string | null;
+  canProceed?: boolean;
+  parseToken?: string | null;
+  sheetName?: string;
+  totalRows?: number;
+  rows?: ParsedRow[];
+  issues?: ParseIssue[];
+};
+
+type CompanyData = Record<string, string>;
+
+type ErrorResponse = {
+  error?: string;
+};
+
+/**
+ * Converts a local `Date` value into the `yyyy-mm-dd` format used by date
+ * inputs without allowing the UTC conversion to shift the calendar day.
+ *
+ * @param date - Local date to format.
+ * @returns The date formatted for an HTML date input.
+ */
 function toInputDate(date: Date) {
   const offset = date.getTimezoneOffset() * 60 * 1000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
+/**
+ * Creates the default coverage period using the first and last days of the
+ * current local month.
+ *
+ * @returns The initial policy coverage period for the form.
+ */
 function defaultVigencia(): Vigencia {
   const now = new Date();
 
@@ -42,12 +105,26 @@ function defaultVigencia(): Vigencia {
   };
 }
 
+/**
+ * Converts an HTML date-input value into the `dd/mm/yyyy` format expected by
+ * the insurer PDF templates.
+ *
+ * @param isoDate - Date in `yyyy-mm-dd` format.
+ * @returns The formatted date, or an empty string when no date is supplied.
+ */
 function formatDateForPdf(isoDate: string) {
   if (!isoDate) return "";
   const [yyyy, mm, dd] = isoDate.split("-");
   return `${dd}/${mm}/${yyyy}`;
 }
 
+/**
+ * Runs the insurer-specific Excel upload and SCTR document-generation flow.
+ *
+ * @param insurer - Selected insurer key used for validation and PDF rendering.
+ * @param lang - Active language used for interface translations.
+ * @returns The upload form, validation results, data preview, and payment tools.
+ */
 export default function UploadTrama({
   insurer,
   lang = "es",
@@ -55,14 +132,33 @@ export default function UploadTrama({
   insurer: string;
   lang?: Lang;
 }) {
+  // Load the translated labels used throughout the upload workflow.
   const t = text[lang].upload;
+  // Store the original workbook so it can be parsed and later delivered.
   const [file, setFile] = useState<File | null>(null);
+  // Track active workbook-parsing requests.
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  // Hold the normalized rows, validation issues, and signed parse token.
+  const [result, setResult] = useState<ParseResult | null>(null);
+  // Display parsing, validation, checkout, preview, or PDF-generation errors.
   const [error, setError] = useState<string | null>(null);
+  // Initialize the coverage period to the current calendar month.
   const [vigencia, setVigencia] = useState<Vigencia>(() => defaultVigencia());
 
-  const companyByInsurer: Record<string, any> = {
+  /*
+   * Normalize optional API collections to arrays so rendering and generation
+   * code can safely access `.length`, `.slice`, and `.map`.
+   */
+  const parsedRows = result?.rows ?? [];
+  const parseIssues = result?.issues ?? [];
+
+  /**
+   * Insurer-specific certificate metadata passed to the PDF templates.
+   *
+   * The user-selected coverage dates below override the static coverage values
+   * in these base records before generation.
+   */
+  const companyByInsurer: Record<string, CompanyData> = {
     lapositiva: {
       empresa: "CONSORCIO ROVELLA-INMAC",
       emisionLugar: "Miraflores",
@@ -111,19 +207,34 @@ export default function UploadTrama({
     },
   };
 
+  // Use an empty object for unsupported insurer keys to keep rendering safe.
   const companyBase = companyByInsurer[insurer] ?? {};
 
+  /*
+   * Both coverage dates are required, and the start date cannot occur after the
+   * end date. ISO date strings can be compared lexicographically.
+   */
   const datesValid =
     Boolean(vigencia.inicio) &&
     Boolean(vigencia.fin) &&
     vigencia.inicio <= vigencia.fin;
 
+  /*
+   * Merge the selected insurer's certificate data with the coverage dates
+   * currently entered by the user.
+   */
   const company = {
     ...companyBase,
     vigenciaInicio: formatDateForPdf(vigencia.inicio),
     vigenciaFin: formatDateForPdf(vigencia.fin),
   };
 
+  /**
+   * Converts an insurer route key into a user-facing label.
+   *
+   * @param value - Insurer key to display.
+   * @returns A formatted insurer name.
+   */
   function insurerLabel(value?: string) {
     const v = String(value ?? "").toLowerCase();
     if (v === "rimac") return "Rimac";
@@ -132,40 +243,59 @@ export default function UploadTrama({
     return value ?? "";
   }  
 
+  /*
+   * Payment is available only when parsing succeeded, the workbook template
+   * matches the selected insurer, no issues remain, and the server returned a
+   * signed parse-guard token.
+   */
   const canPay =
     Boolean(result?.canProceed) &&
     result?.detectedInsurer === insurer &&
-    (result?.issues?.length ?? 0) === 0 &&
+    parseIssues.length === 0 &&
     Boolean(result?.parseToken);
 
+  // Final generation additionally requires a valid policy coverage period.
   const canGeneratePdf = canPay && datesValid;
 
+  /**
+   * Uploads the selected workbook for server-side parsing and validation.
+   */
   async function parseNow() {
     if (!file) return;
 
+    // Clear stale results while the newly selected workbook is processed.
     setLoading(true);
     setError(null);
     setResult(null);
 
     try {
+      // Send the original file and selected insurer as multipart form data.
       const fd = new FormData();
       fd.append("file", file);
       fd.append("insurer", insurer);
 
       const res = await fetch("/api/parse-trama", { method: "POST", body: fd });
-      const data = await res.json();
+      const data = (await res.json()) as ParseResult & ErrorResponse;
 
+      // Surface the API-provided validation or parsing error when available.
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       setResult(data);
-    } catch (e: any) {
-      setError(e?.message || "Error parsing file");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Error parsing file"));
     } finally {
       setLoading(false);
     }
   }
 
+  /**
+   * Requests a preview or paid PDF and starts a browser download.
+   *
+   * @param opts.preview - Marks a development-only preview request.
+   * @param opts.sessionId - Paid Stripe Checkout session for final generation.
+   */
   async function generatePdf(opts?: { preview?: boolean; sessionId?: string }) {
-    if (!result?.rows?.length) return;
+    // PDF templates require at least one parsed employee row.
+    if (parsedRows.length === 0) return;
 
     if (!datesValid) {
       setError(t.invalidDates);
@@ -177,15 +307,23 @@ export default function UploadTrama({
       return;
     }
 
+    /*
+     * Send the validated rows, signed parse token, insurer metadata, coverage
+     * period, and optional Stripe session to the PDF route.
+     */
     const payload = {
       insurer,
       preview: Boolean(opts?.preview),
       sessionId: opts?.sessionId,
       parseToken: result?.parseToken ?? null,
       company,
-      rows: result.rows,
+      rows: parsedRows,
     };
 
+    /*
+     * Include the original workbook with the JSON payload so paid requests can
+     * deliver the source file to the selected insurer after rendering.
+     */
     const fd = new FormData();
     fd.append("payload", JSON.stringify(payload));
     fd.append("originalExcel", file, file.name);
@@ -196,21 +334,34 @@ export default function UploadTrama({
     });
 
     if (!res.ok) {
-      const data = await res.json().catch(() => ({} as any));
+      const data = (await res.json().catch(() => ({}))) as ErrorResponse;
       throw new Error(data?.error || "PDF error");
     }
 
+    // Convert the PDF response into a temporary browser download URL.
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `SCTR_${insurer}.pdf`;
     a.click();
+
+    // Release the temporary object URL after initiating the download.
     URL.revokeObjectURL(url);
   }
 
+  /*
+   * Preview generation is exposed only when explicitly enabled through a
+   * public build-time environment variable.
+   */
   const allowPreview = process.env.NEXT_PUBLIC_ALLOW_PDF_PREVIEW === "true";
 
+  /**
+   * Builds a display name from either the full-name field or split name fields.
+   *
+   * @param row - Parsed employee row.
+   * @returns A normalized employee name for the preview table.
+   */
   function fullName(row: ParsedRow) {
     if (row.nombrecompleto?.trim()) return row.nombrecompleto.trim();
 
@@ -221,6 +372,10 @@ export default function UploadTrama({
       .trim();
   }
 
+  /*
+   * Select the preview-table columns required by the active insurer. Memoizing
+   * the configuration avoids rebuilding it on unrelated state updates.
+   */
   const previewColumns = useMemo(() => {
     if (insurer === "mapfre") {
       return [
@@ -259,15 +414,25 @@ export default function UploadTrama({
     ];
   }, [insurer]);
 
+  /**
+   * Resolves computed and direct values for one preview-table cell.
+   *
+   * @param row - Parsed employee row.
+   * @param key - Column key or supported computed-field identifier.
+   * @param index - Zero-based row position in the preview.
+   * @returns The value displayed in the table cell.
+   */
   function renderCell(row: ParsedRow, key: string, index: number) {
     if (key === "__index") return index + 1;
     if (key === "__fullname") return fullName(row);
-    return (row as any)[key] ?? "";
+    return row[key] ?? "";
   }
 
   return (
+    /* Outer glass panel containing the complete upload workflow. */
     <div className="mt-8 w-full max-w-5xl rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-2xl backdrop-blur-2xl">
       <div className="rounded-[1.5rem] border border-white/10 bg-zinc-950/80 p-6">
+        {/* Step heading and currently selected insurer. */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-teal-200">
@@ -285,12 +450,14 @@ export default function UploadTrama({
         </div>
 
         <div className="mt-6 grid gap-5">
+          {/* Accessible drop-zone-style control for selecting the workbook. */}
           <label className="group flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-700 bg-zinc-950/70 px-6 py-8 text-center transition hover:border-teal-300/50 hover:bg-zinc-950">
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
               className="sr-only"
               onChange={(e) => {
+                // Selecting a new file invalidates all previous parse results.
                 const f = e.target.files?.[0] ?? null;
                 setFile(f);
                 setResult(null);
@@ -309,6 +476,7 @@ export default function UploadTrama({
             <p className="mt-1 text-sm text-zinc-500">{t.supports}</p>
           </label>
 
+          {/* Policy coverage-period inputs used by every PDF template. */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
             <div className="flex flex-col gap-1">
               <h3 className="text-lg font-extrabold text-zinc-100">
@@ -365,6 +533,7 @@ export default function UploadTrama({
             )}
           </div>
 
+          {/* Parse, preview, payment, and generation actions. */}
           <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-zinc-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-teal-200">
@@ -389,13 +558,15 @@ export default function UploadTrama({
                 {loading ? t.parsing : t.parseFile}
               </button>
 
-              {result?.rows?.length > 0 && (
+              {/* Generation controls appear only after rows are parsed. */}
+              {parsedRows.length > 0 && (
                 <>
+                  {/* Development-only preview bypasses the payment popup. */}
                   {allowPreview && canGeneratePdf && (
                     <button
                       onClick={() =>
-                        generatePdf({ preview: true }).catch((e: any) =>
-                          setError(e?.message || "Preview PDF error")
+                        generatePdf({ preview: true }).catch((error: unknown) =>
+                          setError(getErrorMessage(error, "Preview PDF error"))
                         )
                       }
                       className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-bold text-zinc-100 transition hover:border-teal-300/40 hover:bg-white/[0.07]"
@@ -404,6 +575,7 @@ export default function UploadTrama({
                     </button>
                   )}
 
+                  {/* Paid generation is delegated to the Stripe workflow. */}
                   <PayAndGenerateButton
                     insurer={insurer}
                     parseToken={result?.parseToken ?? null}
@@ -415,12 +587,14 @@ export default function UploadTrama({
             </div>
           </div>
 
+          {/* Display the most recent user-actionable workflow error. */}
           {error && (
             <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300">
               {error}
             </p>
           )}
 
+          {/* Workbook summary, validation issues, and row preview. */}
           {result && (
             <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
               <div className="grid gap-3 sm:grid-cols-3">
@@ -450,6 +624,7 @@ export default function UploadTrama({
                 </div>
               </div>
 
+              {/* Warn when the uploaded workbook belongs to another insurer. */}
               {result?.detectedInsurer && result.detectedInsurer !== insurer && (
                 <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                   {t.wrongTemplateA} <b>{insurerLabel(insurer)}</b>{" "}
@@ -459,27 +634,29 @@ export default function UploadTrama({
                 </p>
               )}
 
-              {result.issues?.length > 0 && (
+              {/* Show up to the first 20 validation issues from the parser. */}
+              {parseIssues.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-lg font-extrabold text-zinc-100">
                     {t.issuesFound}
                   </h3>
 
                   <ul className="mt-3 space-y-2 text-sm text-zinc-300">
-                    {result.issues.slice(0, 20).map((i: any, idx: number) => (
+                    {parseIssues.slice(0, 20).map((issue, idx) => (
                       <li
                         key={idx}
                         className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-red-300"
                       >
-                        Row {i.row} {i.field ? `(${i.field})` : ""}:{" "}
-                        {i.message}
+                        Row {issue.row} {issue.field ? `(${issue.field})` : ""}:{" "}
+                        {issue.message}
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {result?.rows?.length > 0 && (
+              {/* Preview up to 50 normalized employee rows. */}
+              {parsedRows.length > 0 && (
                 <div className="mt-6">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <div>
@@ -509,7 +686,7 @@ export default function UploadTrama({
                       </thead>
 
                       <tbody>
-                        {result.rows
+                        {parsedRows
                           .slice(0, 50)
                           .map((row: ParsedRow, idx: number) => (
                             <tr

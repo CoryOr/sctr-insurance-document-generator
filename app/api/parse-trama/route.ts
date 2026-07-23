@@ -1,17 +1,52 @@
+/**
+ * Excel parsing and validation API route for the SCTR Insurance Document Generator.
+ *
+ * This endpoint accepts an insurer selection and an uploaded Excel workbook,
+ * identifies the insurer template represented by the workbook, normalizes the
+ * employee data, and applies insurer-specific validation rules.
+ *
+ * Main responsibilities:
+ * - Enforce workbook size, row, and column processing limits.
+ * - Select the expected worksheet for MAPFRE, Rímac, or La Positiva.
+ * - Normalize header aliases into the application's canonical field names.
+ * - Detect which insurer template was uploaded from sheet and column patterns.
+ * - Convert worksheet rows into a consistent `ParsedRow` structure.
+ * - Report row-level validation issues without discarding usable parsed data.
+ * - Sign a parse-guard token only when the workbook is valid and matches the
+ *   insurer selected by the user.
+ *
+ * The resulting parse token is later verified by the checkout and PDF routes
+ * so payment and document generation can only continue with the validated
+ * workbook.
+ */
+
 // app/api/parse-trama/route.ts
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { z } from "zod";
 import { signParseGuard } from "@/lib/parse-guard";
 
+/**
+ * XLSX parsing and parse-token signing depend on Node.js-compatible APIs.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Describes a validation problem associated with an Excel row and, when
+ * available, a canonical employee field.
+ */
 type Issue = {
   row: number;
   field?: string;
   message: string;
 };
 
+/**
+ * Normalized employee record produced from an insurer workbook row.
+ *
+ * `__row` preserves the original one-based Excel row number so validation
+ * messages can point users back to the correct source row.
+ */
 type ParsedRow = {
   __row: string;
   nombres?: string;
@@ -35,6 +70,16 @@ type ParsedRow = {
   correo?: string;
 };
 
+/**
+ * Converts an arbitrary worksheet header into a comparison-friendly key.
+ *
+ * Trimming, lowercasing, removing diacritics, and deleting punctuation allows
+ * labels such as "Número Documento", "numero-documento", and "NumeroDocumento"
+ * to be matched through the same canonical-header map.
+ *
+ * @param h - Raw worksheet header value.
+ * @returns A lowercase alphanumeric header key.
+ */
 function normalizeHeader(h: unknown) {
   return String(h ?? "")
     .trim()
@@ -44,10 +89,25 @@ function normalizeHeader(h: unknown) {
     .replace(/[^a-z0-9]+/g, "");
 }
 
+/**
+ * Safely converts an unknown cell value into a trimmed string.
+ *
+ * @param v - Raw cell value.
+ * @returns The trimmed string representation, or an empty string for nullish values.
+ */
 function safeString(v: unknown) {
   return String(v ?? "").trim();
 }
 
+/**
+ * Normalizes supported birth-date text formats to `dd/mm/yyyy`.
+ *
+ * Values outside the recognized formats are returned unchanged so the
+ * insurer-specific validation phase can report a precise format issue.
+ *
+ * @param v - Raw birth-date cell value.
+ * @returns A normalized date string when possible.
+ */
 function formatFechaNac(v: unknown) {
   const s = String(v ?? "").trim();
   if (!s) return "";
@@ -67,6 +127,16 @@ function formatFechaNac(v: unknown) {
   return s;
 }
 
+/**
+ * Normalizes salary text to the decimal format expected by downstream
+ * templates and validation.
+ *
+ * Supported inputs include comma thousands separators, dot decimals, and a
+ * single comma used as the decimal separator.
+ *
+ * @param v - Raw remuneration value.
+ * @returns A compact numeric string using a dot as the decimal separator.
+ */
 function normalizeRemuneracion(v: unknown) {
   const s = String(v ?? "").trim();
   if (!s) return "";
@@ -88,6 +158,12 @@ function normalizeRemuneracion(v: unknown) {
   return compact;
 }
 
+/**
+ * Converts Rímac document-type codes and aliases into canonical labels.
+ *
+ * @param v - Raw document-type value.
+ * @returns `DNI`, `CE`, `PAS`, or the original normalized value.
+ */
 function normalizeRimacTipoDoc(v: unknown) {
   const s = String(v ?? "").trim().toUpperCase();
   if (!s) return "";
@@ -99,10 +175,22 @@ function normalizeRimacTipoDoc(v: unknown) {
   return s;
 }
 
+/**
+ * Checks whether a name field contains only letters, spaces, and common
+ * Spanish accented characters.
+ *
+ * @param v - Name or surname value to validate.
+ */
 function onlyLettersSpaces(v: string) {
   return /^[A-ZÁÉÍÓÚÑ ]+$/i.test(v.trim());
 }
 
+/**
+ * Canonical fields that may be copied from workbook columns into parsed rows.
+ *
+ * Keeping this allowlist separate from the alias map prevents an unexpected
+ * header mapping from creating arbitrary properties on parsed records.
+ */
 const ALLOWED_KEYS = new Set([
   "nombres",
   "primernombre",
@@ -125,6 +213,13 @@ const ALLOWED_KEYS = new Set([
   "correo",
 ]);
 
+/**
+ * Maps normalized insurer header aliases to the application's canonical field
+ * names.
+ *
+ * The aliases account for naming differences across insurer templates and
+ * common variations in Spanish Excel headers.
+ */
 const CANON_MAP: Record<string, string> = {
   nombres: "nombres",
   nombre: "nombres",
@@ -184,6 +279,13 @@ const CANON_MAP: Record<string, string> = {
   email: "correo",
 };
 
+/**
+ * Structural Zod schema for normalized worksheet rows.
+ *
+ * All recognized fields are optional here because required-field and
+ * insurer-specific business rules are evaluated separately with clearer,
+ * user-facing issue messages.
+ */
 const RowSchema = z.object({
   nombres: z.string().optional(),
   primernombre: z.string().optional(),
@@ -206,23 +308,51 @@ const RowSchema = z.object({
   correo: z.string().optional(),
 });
 
+/**
+ * Creates a set of canonical field names represented by a worksheet header row.
+ *
+ * @param headerRow - Raw first-row cell values.
+ * @returns A set containing canonical or normalized header keys.
+ */
 function canonicalHeaderSet(headerRow: unknown[]) {
   const raw = headerRow.map((h) => normalizeHeader(h));
   const canon = raw.map((h) => CANON_MAP[h] ?? h);
   return new Set(canon);
 }
 
+/**
+ * Determines whether a header row contains every field required by a template
+ * signature.
+ *
+ * @param headerRow - Raw worksheet header values.
+ * @param expectedCanonKeys - Canonical fields required for a match.
+ */
 function hasCanonicalHeaders(headerRow: unknown[], expectedCanonKeys: string[]) {
   const found = canonicalHeaderSet(headerRow);
   return expectedCanonKeys.every((k) => found.has(k));
 }
 
+/**
+ * Identifies the insurer template represented by a workbook.
+ *
+ * Detection uses distinctive canonical column combinations and, for MAPFRE,
+ * an expected worksheet-name pattern. The order is intentional because some
+ * insurer templates share common employee fields.
+ *
+ * @param wb - Parsed XLSX workbook.
+ * @param headerRow - Header row from the selected worksheet.
+ * @returns The detected insurer key, or `null` when no template matches.
+ */
 function detectInsurerFromWorkbook(
   wb: XLSX.WorkBook,
   headerRow: unknown[]
 ): string | null {
   const sheetNames = wb.SheetNames.map((s) => normalizeHeader(s));
 
+  /*
+   * Rímac is identified by its product, split-name, birth-date, and sex
+   * columns.
+   */
   // RIMAC
   if (
     hasCanonicalHeaders(headerRow, [
@@ -238,6 +368,10 @@ function detectInsurerFromWorkbook(
     return "rimac";
   }
 
+  /*
+   * MAPFRE requires a "trabajadores" worksheet and supports either split-name
+   * or full-name template variants.
+   */
   // MAPFRE
   if (
     sheetNames.some((s) => s.includes("trabajadores")) &&
@@ -258,6 +392,10 @@ function detectInsurerFromWorkbook(
     return "mapfre";
   }
 
+  /*
+   * La Positiva is identified by its employee names, currency, remuneration,
+   * and worker-type columns.
+   */
   // LA POSITIVA
   if (
     hasCanonicalHeaders(headerRow, [
@@ -278,6 +416,16 @@ function detectInsurerFromWorkbook(
   return null;
 }
 
+/**
+ * Selects the worksheet most likely to contain employee enrollment data.
+ *
+ * MAPFRE and Rímac templates use recognizable sheet names. Other cases fall
+ * back to the workbook's first worksheet.
+ *
+ * @param wb - Parsed XLSX workbook.
+ * @param insurer - Insurer selected by the user.
+ * @returns The worksheet name to parse.
+ */
 function pickSheetName(wb: XLSX.WorkBook, insurer: string) {
   const insurerLc = insurer.toLowerCase();
 
@@ -298,8 +446,23 @@ function pickSheetName(wb: XLSX.WorkBook, insurer: string) {
   return wb.SheetNames[0];
 }
 
+/**
+ * Parses and validates an uploaded insurer workbook.
+ *
+ * Expected multipart form fields:
+ * - `file`: Excel workbook containing employee data.
+ * - `insurer`: Insurer key selected in the application.
+ *
+ * @param req - Incoming multipart request.
+ * @returns Parsed rows, validation issues, insurer detection results, and a
+ * signed parse token when the workbook can proceed.
+ */
 export async function POST(req: Request) {
   try {
+    /*
+     * Read the upload and normalize the user-selected insurer for all later
+     * template comparisons.
+     */
     const form = await req.formData();
     const file = form.get("file");
     const insurer = String(form.get("insurer") ?? "").toLowerCase();
@@ -308,6 +471,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing file" }, { status: 400 });
     }
 
+    /*
+     * Bound memory and processing work for uploaded spreadsheets. Rows and
+     * columns beyond these limits are intentionally ignored.
+     */
     const MAX_BYTES = 8 * 1024 * 1024;
     const MAX_ROWS = 6000;
     const MAX_COLS = 80;
@@ -321,6 +488,11 @@ export async function POST(req: Request) {
 
     const arrayBuffer = await file.arrayBuffer();
 
+    /*
+     * Parse cell values as display text rather than raw Excel serial values.
+     * Dense mode represents the worksheet as arrays, which matches the
+     * row-oriented conversion performed below.
+     */
     const wb = XLSX.read(arrayBuffer, {
       type: "array",
       dense: true,
@@ -332,6 +504,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No sheets found" }, { status: 400 });
     }
 
+    /*
+     * Select the insurer-specific employee worksheet when possible, then
+     * retrieve the corresponding XLSX worksheet object.
+     */
     const sheetName = pickSheetName(wb, insurer);
     const ws = wb.Sheets[sheetName];
 
@@ -339,6 +515,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sheet not found" }, { status: 400 });
     }
 
+    /*
+     * Convert the worksheet into a two-dimensional array. The first row is
+     * treated as headers and each later row as one employee record.
+     */
     const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
       header: 1,
       defval: "",
@@ -350,6 +530,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Empty sheet" }, { status: 400 });
     }
 
+    /*
+     * Limit header processing, detect the uploaded template, and create a
+     * column-index map from workbook headers to canonical employee fields.
+     * Unrecognized or disallowed columns are represented by `null` and skipped.
+     */
     const headerRow = (grid[0] ?? []).slice(0, MAX_COLS);
     const detectedInsurer = detectInsurerFromWorkbook(wb, headerRow);
 
@@ -372,11 +557,19 @@ export async function POST(req: Request) {
       );
     }
 
+    /*
+     * Collect normalized rows and all validation issues so the client can show
+     * a complete correction list in a single response.
+     */
     const issues: Issue[] = [];
     const rows: ParsedRow[] = [];
 
     const dataRows = grid.slice(1, MAX_ROWS + 1);
 
+    /*
+     * Convert each non-header worksheet row into a canonical `ParsedRow`.
+     * Excel row numbers begin at two because the first row contains headers.
+     */
     dataRows.forEach((r, idx) => {
       const excelRow = idx + 2;
       const out: ParsedRow = { __row: String(excelRow) };
@@ -395,6 +588,11 @@ export async function POST(req: Request) {
         out[key as keyof ParsedRow] = value;
       }
 
+      /*
+       * Rímac may split first and second names into separate columns and encode
+       * document types numerically. Merge and normalize those fields before
+       * validation and template rendering.
+       */
       if (insurer.includes("rimac")) {
         out.tipodoc = normalizeRimacTipoDoc(out.tipodoc);
 
@@ -418,12 +616,20 @@ export async function POST(req: Request) {
         delete (out as Partial<ParsedRow>).segundonombre;
       }
 
+      /*
+       * Ignore completely empty worksheet rows while retaining the original
+       * Excel row number for every populated record.
+       */
       const hasAnyValue = Object.entries(out).some(
         ([k, v]) => k !== "__row" && String(v ?? "").trim() !== ""
       );
 
       if (!hasAnyValue) return;
 
+      /*
+       * Capture structural schema issues without throwing so all rows can be
+       * processed and reported together.
+       */
       const parsed = RowSchema.safeParse(out);
       if (!parsed.success) {
         for (const i of parsed.error.issues) {
@@ -438,6 +644,10 @@ export async function POST(req: Request) {
       rows.push(out);
     });
 
+    /*
+     * Apply required-field and insurer-specific business validation after all
+     * rows have been normalized.
+     */
     rows.forEach((r) => {
       const row = Number(r.__row ?? 0);
 
@@ -457,6 +667,10 @@ export async function POST(req: Request) {
         });
       }
 
+      /*
+       * MAPFRE accepts either a full-name field or a combination of paternal
+       * surname and names. Salary is required in normalized numeric format.
+       */
       if (insurer.includes("mapfre")) {
         const hasSplitName = Boolean(
           String(r.paterno ?? "").trim() && String(r.nombres ?? "").trim()
@@ -486,6 +700,10 @@ export async function POST(req: Request) {
             message: "Sueldo debe usar punto decimal, ejemplo: 100000.53",
           });
         }
+      /*
+       * Rímac validates product, identity, names, birth date, sex, document
+       * type, and insurer-specific document-number lengths.
+       */
       } else if (insurer.includes("rimac")) {
         const hasSplitName = Boolean(
           String(r.paterno ?? "").trim() && String(r.nombres ?? "").trim()
@@ -605,6 +823,11 @@ export async function POST(req: Request) {
           });
         }
       } else {
+        /*
+         * The remaining supported path corresponds to La Positiva's core
+         * required name fields. Shared document checks were already applied
+         * above.
+         */
         if (!String(r.nombres ?? "").trim()) {
           issues.push({
             row,
@@ -623,6 +846,10 @@ export async function POST(req: Request) {
       }
     });
 
+    /*
+     * Add a workbook-level issue when template detection disagrees with the
+     * insurer selected in the interface.
+     */
     const mismatchIssues =
       detectedInsurer && detectedInsurer !== insurer
         ? [
@@ -636,11 +863,21 @@ export async function POST(req: Request) {
 
     const finalIssues = [...mismatchIssues, ...issues];
 
+    /*
+     * A workbook may proceed only when its detected insurer matches the user's
+     * selection, at least one employee row exists, and no validation issues
+     * remain.
+     */
     const canProceed =
       detectedInsurer === insurer &&
       rows.length > 0 &&
       finalIssues.length === 0;
 
+    /*
+     * Sign server-trusted parse results only for a fully valid workbook.
+     * Checkout and PDF generation later verify this token instead of trusting
+     * client-supplied validation state.
+     */
     const parseToken = canProceed
       ? signParseGuard({
           selectedInsurer: insurer,
@@ -650,6 +887,10 @@ export async function POST(req: Request) {
         })
       : null;
 
+    /*
+     * Return all parsed rows for document generation, a small preview for the
+     * interface, and the complete set of issues for user correction.
+     */
     return NextResponse.json({
       insurer,
       detectedInsurer,
@@ -662,6 +903,10 @@ export async function POST(req: Request) {
       issues: finalIssues,
     });
   } catch (error) {
+    /*
+     * Log the underlying parser failure on the server while returning a stable,
+     * non-sensitive error message to the client.
+     */
     console.error("parse-trama error:", error);
     return NextResponse.json(
       { error: "Failed to parse file" },

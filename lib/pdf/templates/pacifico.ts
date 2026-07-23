@@ -1,6 +1,11 @@
-import { baseCss, esc, footerWatermark, rosterTable } from "./base";
+//note: I haven't worked with Pacifico yet so this is not important
 
-export function renderPacifico({ insurer, company, rows }: any) {
+import { baseCss, esc, footerWatermark, rosterTable } from "./base";
+import type { PdfTemplateData } from "./types";
+
+export function renderPacifico(
+  { insurer = "", company = {}, rows = [] }: PdfTemplateData
+) {
   return `<!doctype html>
 <html>
 <head>
